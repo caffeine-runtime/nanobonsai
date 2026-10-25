@@ -23,7 +23,7 @@ C++ sources of the `UnityCefPlugin` bridge and the `UnityCefHelper` subprocess u
 
 The repository carries prebuilt `UnityCefPlugin.dll` and `UnityCefHelper.exe` in `Assets/Plugins/x86_64`; `fetch-cef-windows.ps1` adds the CEF runtime beside them. To rebuild them, unpack the CEF 148.0.10 Windows x64 minimal distribution from [CEF's builds](https://cef-builds.spotifycdn.com/index.html) and configure CMake with `CEF_ROOT`. The outputs are written to `Assets/Plugins/x86_64`; close Unity first, since it holds the loaded DLL.
 
-With Visual Studio:
+With Visual Studio (CMake's standard path, not yet tested; the prebuilt binaries come from the MinGW build below):
 
 ```powershell
 cmake -S NativePlugin -B NativePlugin/build -DCEF_ROOT="C:/path/to/cef_binary_148.0.10+g7ee53f5+chromium-148.0.7778.218_windows64_minimal"

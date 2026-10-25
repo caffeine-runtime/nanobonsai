@@ -2,19 +2,26 @@
 
 **HTML, CSS and JavaScript interfaces for Unity, rendered by Chromium.**
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Unity 6000.4](https://img.shields.io/badge/Unity-6000.4-black.svg)
+![Platforms](https://img.shields.io/badge/platforms-Windows%20x64%20%7C%20macOS%20arm64%20%28experimental%29-lightgrey.svg)
+![CEF 148](https://img.shields.io/badge/CEF-148-4285F4.svg)
+
+![The sample page in a Windows player: a translucent panel over the Unity scene, with a heartbeat from C#, Send and Ping buttons, and a log of the messages exchanged](docs/sample.png)
+
 nanobonsai embeds the [Chromium Embedded Framework](https://bitbucket.org/chromiumembedded/cef) (CEF) in Unity 6. It renders HTML pages offscreen and draws them into a uGUI `RawImage`, with pointer, wheel and keyboard input forwarded and JSON messages both ways between the page and C#. You can build menus, HUDs and tools with the web stack and lay them over the game, with transparency.
 
 ## Features
 
 - **Chromium 148 in Unity 6**: Windows x64 in the Editor and in players; Apple Silicon macOS players (experimental).
 - **GPU frame hand-off under Direct3D 12.** Chromium's shared texture is copied into the view's texture on Unity's render thread, so frames never cross the CPU. Under Direct3D 11 frames are copied straight into the texture's memory, and a failed hand-off falls back to that path on its own.
-- **Smooth motion.** Pages paint at the display's refresh within 120-144 FPS instead of CEF's default 30.
+- **Smooth motion.** Pages paint up to 120-144 times a second (the display's refresh, kept within that range) instead of CEF's default 30.
 - **Transparent pages** over the game, sized to the screen or to any `RectTransform`, DPI-correct through the canvas scale.
 - **Two-way JSON messaging**: `UnityBridge.send` / `sendToUnity` in the page, `OnMessage` / `SendToJavaScript` in C#.
-- **World-click blocking**: the page tells Unity when the pointer is over its UI, so clicks on transparent areas reach the game.
+- **World-click blocking**: the page reports when the pointer is over its UI, so clicks on transparent areas can reach the game.
 - **Side-by-side instances.** Each process gets its own CEF cache folder, so several game instances (for example local multiplayer testing) can run at once. Folders of ended processes are cleaned up at the next start.
-- **Ready for players.** A build step copies the CEF runtime, its license files and the bridge's notices into Windows and Mac players.
-- **Small, readable bridge**: one C# component and one C++ file, buildable with Visual Studio or MinGW.
+- **Ready for players.** A build step copies the CEF runtime, its license files and the bridge's notices into Windows players (and, experimentally, Mac players).
+- **Small, readable bridge**: one C# component and one C++ file. Prebuilt Windows binaries are included, built with MinGW-w64; the CMake project also has the standard Visual Studio path, not yet tested.
 
 ## Requirements
 
@@ -26,11 +33,11 @@ nanobonsai embeds the [Chromium Embedded Framework](https://bitbucket.org/chromi
 ## Quick start
 
 1. **Clone** the repository.
-2. **Fetch the CEF runtime** with Unity closed. This downloads the pinned CEF 148 build (about 160 MB, SHA-1 checked) from CEF's official builds and copies the runtime into `Assets/Plugins/x86_64`:
+2. **Fetch the CEF runtime** from the repository folder, before opening the project in Unity. This downloads the pinned CEF 148 build (about 160 MB, SHA-1 checked) from CEF's official builds and copies the runtime into `Assets/Plugins/x86_64`:
    ```powershell
    powershell -ExecutionPolicy Bypass -File NativePlugin\fetch-cef-windows.ps1
    ```
-3. **Open the project** in Unity 6000.4.
+3. **Open the project**: add the folder in Unity Hub and open it with Unity 6000.4.
 4. Choose **CEF > Create Nanobonsai Sample Scene**, then press **Play**. The sample page shows Unity's platform and version, a heartbeat from C#, and Send and Ping buttons that round-trip through `CefTemplateBridge`.
 
 ## Using it
@@ -59,16 +66,16 @@ Include `global.js`, which defines the bridge:
 </script>
 ```
 
-| JavaScript | C# |
-| --- | --- |
-| `UnityBridge.send(object)` / `sendToUnity(type, payload)` | `HtmlUiView.OnMessage(string json)`, on Unity's main thread |
-| `UnityBridge.onMessage(callback)` | `HtmlUiView.SendToJavaScript(string json)` |
+| Direction | In the page (JavaScript) | In Unity (C#) |
+| --- | --- | --- |
+| Page → Unity | `sendToUnity(type, payload)` or `UnityBridge.send(object)` | the `HtmlUiView.OnMessage` event receives the JSON string, on Unity's main thread |
+| Unity → Page | `UnityBridge.onMessage(callback)` receives the parsed object | `HtmlUiView.SendToJavaScript(json)` |
 
 `CefTemplateBridge` is a small example of routing messages by `type` with `JsonUtility`.
 
 ### Letting clicks through to the game
 
-Pages are transparent, so the page decides where its UI is. Send `html-pointer-block` when the pointer enters or leaves your panels, and check `HtmlUiView.IsWorldPointerBlocked` before handling world clicks:
+Pages are transparent, so only the page knows where its UI is. Nothing is sent automatically: send `html-pointer-block` when the pointer enters or leaves your panels, and check `HtmlUiView.IsWorldPointerBlocked` before handling world clicks:
 
 ```js
 panel.addEventListener('mouseenter', () => sendToUnity('html-pointer-block', { blocking: true }));
@@ -92,11 +99,18 @@ Pointer, buttons and wheel come through uGUI's event system. While the pointer i
  page (HTML/JS)                    UnityCefPlugin (C++)                      HtmlUiView (C#)
  console.log("unity:" + json) ──▶  OnConsoleMessage ──▶ callback  ──────▶  OnMessage (main thread)
  UnityBridge._receive(json)  ◀──   ExecuteJS          ◀────────────────── SendToJavaScript
- Chromium paints a frame     ──▶   D3D12: shared texture → own frames ──▶ render thread copies into the texture
+ Chromium paints a frame     ──▶   D3D12: shared texture → bridge's frame ──▶ render thread copies into the texture
                                    otherwise: CPU buffer             ──▶  copied into the texture's memory
 ```
 
 CEF runs in its own processes (`UnityCefHelper`) and, on Windows, on its own UI thread. On macOS it runs on Unity's main thread, pumped once per frame. [NativePlugin/README.md](NativePlugin/README.md) covers the bridge and how to rebuild it.
+
+## Troubleshooting
+
+- **`Failed to load libcef.dll` or `CEF initialization failed`**: the CEF runtime is missing. Close Unity, run `NativePlugin\fetch-cef-windows.ps1`, and open the project again.
+- **The view stays empty**: the path given to `LoadStreamingAsset` is relative to `Assets/StreamingAssets` (for example `ui/index.html`). CEF writes its own log to `%TEMP%\UnityCef\<pid>.log`.
+- **Clicks or typing do not reach the page**: the canvas needs a `GraphicRaycaster` and the scene an `EventSystem`. Keys go to the page only while the pointer is over the view.
+- **A player opens without UI**: build it from the Editor so `CefPlayerPayload` runs, and keep the files it adds to `<Game>_Data/Plugins/x86_64` together when you ship.
 
 ## Limitations
 

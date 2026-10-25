@@ -180,3 +180,6 @@ Assets/Plugins/x86_64/UnityCefHelper.exe -filter binary
 *.mm                    text diff=objc
 *.sh                    text eol=lf
 *.ps1                   text eol=crlf
+
+# README images stay in plain git: LFS would bill every page view against the bandwidth quota.
+docs/*.png -filter binary
