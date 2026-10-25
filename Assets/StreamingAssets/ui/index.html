@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
+  <title>Nanobonsai CEF Template</title>
+  <script src="global.js"></script>
+  <style>
+    :root {
+      --bg: rgba(7, 9, 13, 0.72);
+      --panel: rgba(25, 29, 38, 0.78);
+      --panel-strong: rgba(35, 40, 52, 0.88);
+      --border: rgba(255, 255, 255, 0.16);
+      --text: #f7f8fb;
+      --muted: #aeb5c2;
+      --accent: #7bd7c4;
+      --accent-strong: #9cf0df;
+      --warning: #f0c46b;
+      --error: #ff7f8a;
+      --shadow: rgba(0, 0, 0, 0.22);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: transparent;
+      color: var(--text);
+      overflow: hidden;
+      user-select: none;
+    }
+
+    body {
+      display: grid;
+      place-items: end center;
+      padding: 28px;
+    }
+
+    .shell {
+      width: min(980px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 18px 54px var(--shadow);
+      backdrop-filter: blur(18px) saturate(1.25);
+      -webkit-backdrop-filter: blur(18px) saturate(1.25);
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.25;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+      min-height: 18px;
+    }
+
+    .pill {
+      min-width: 136px;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      text-align: center;
+      color: var(--accent-strong);
+      font: 600 12px Consolas, "SFMono-Regular", monospace;
+      background: rgba(123, 215, 196, 0.1);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 10px;
+      padding: 16px 20px 20px;
+    }
+
+    input {
+      min-width: 0;
+      height: 42px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.24);
+      color: var(--text);
+      padding: 0 13px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: rgba(123, 215, 196, 0.72);
+    }
+
+    button {
+      height: 42px;
+      border: 1px solid rgba(123, 215, 196, 0.52);
+      border-radius: 6px;
+      background: rgba(123, 215, 196, 0.16);
+      color: var(--text);
+      padding: 0 15px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    button:hover,
+    button:focus-visible {
+      background: rgba(123, 215, 196, 0.26);
+    }
+
+    .log {
+      height: 152px;
+      overflow: hidden auto;
+      border-top: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.22);
+      padding: 12px 20px 16px;
+      font: 12px/1.55 Consolas, "SFMono-Regular", monospace;
+      color: var(--muted);
+    }
+
+    .entry {
+      display: grid;
+      grid-template-columns: 74px minmax(0, 1fr);
+      gap: 10px;
+      padding: 2px 0;
+    }
+
+    .entry strong {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .entry.warning strong {
+      color: var(--warning);
+    }
+
+    .entry.error strong {
+      color: var(--error);
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 14px;
+      }
+
+      .top,
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .pill {
+        min-width: 0;
+        justify-self: start;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="top">
+      <div>
+        <h1>Nanobonsai CEF Template</h1>
+        <div class="status" id="status">Waiting for Unity...</div>
+      </div>
+      <div class="pill" id="heartbeat">tick 0</div>
+    </section>
+
+    <section class="controls">
+      <input id="commandInput" type="text" value="Hello from HTML" autocomplete="off" spellcheck="false">
+      <button id="sendButton" type="button">Send</button>
+      <button id="pingButton" type="button">Ping</button>
+    </section>
+
+    <section class="log" id="log" aria-live="polite"></section>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const heartbeatEl = document.getElementById('heartbeat');
+    const inputEl = document.getElementById('commandInput');
+    const logEl = document.getElementById('log');
+
+    function addLog(label, value, severity) {
+      const row = document.createElement('div');
+      row.className = `entry ${severity || ''}`;
+      const safeValue = typeof value === 'string' ? value : JSON.stringify(value);
+      row.innerHTML = `<strong>${label}</strong><span>${escapeHtml(safeValue)}</span>`;
+      logEl.appendChild(row);
+      while (logEl.children.length > 80) {
+        logEl.removeChild(logEl.firstChild);
+      }
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function send(type, payload = {}) {
+      const message = { type, ...payload };
+      sendToUnity(type, payload);
+      addLog('html', message);
+    }
+
+    function handleUnityMessage(message) {
+      addLog('unity', message, message.severity);
+
+      if (message.type === 'cef-template-ready') {
+        statusEl.textContent = `${message.platform} / Unity ${message.unityVersion}`;
+      }
+
+      if (message.type === 'cef-template-status') {
+        statusEl.textContent = message.text;
+      }
+
+      if (message.type === 'cef-template-tick') {
+        heartbeatEl.textContent = `tick ${message.sequence}`;
+      }
+
+      if (message.type === 'cef-template-pong') {
+        statusEl.textContent = `Pong ${message.realtimeSinceStartup.toFixed(2)}s`;
+      }
+    }
+
+    document.getElementById('sendButton').addEventListener('click', () => {
+      send('cef-template-command', {
+        command: inputEl.value,
+        text: inputEl.value
+      });
+    });
+
+    document.getElementById('pingButton').addEventListener('click', () => {
+      send('cef-template-ping', { text: 'ping' });
+    });
+
+    inputEl.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        document.getElementById('sendButton').click();
+      }
+    });
+
+    if (window.UnityBridge) {
+      UnityBridge.onMessage(handleUnityMessage);
+      send('cef-template-ping', { text: 'initial ping' });
+    } else {
+      statusEl.textContent = 'Unity bridge unavailable';
+      addLog('local', 'Open this page through HtmlUiView.');
+    }
+  </script>
+</body>
+</html>
